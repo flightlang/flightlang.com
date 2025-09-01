@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FlightLang — Drone mission DSL</title>
+  <meta name="description" content="FlightLang is a domain-specific language (DSL) for defining drone missions as clear, type-safe state machines.">
+  <link rel="icon" href="assets/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => { if(window.hljs) hljs.highlightAll(); });</script>
+  <script defer src="script.js"></script>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container nav-inner">
+      <a class="brand" href="/">
+        <img src="assets/logo.svg" alt="FlightLang logo">
+        <span>FlightLang</span>
+      </a>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/docs/">Docs</a>
+        <a href="https://github.com/flightlang" target="_blank" rel="noopener">GitHub</a>
+        <button id="theme-toggle" class="btn ghost" aria-label="Toggle theme">🌗</button>
+        <a class="btn primary" href="/docs/#install">Get Started</a>
+      </div>
+      <button id="menu-btn" class="btn ghost menu-btn" aria-label="Menu">☰</button>
+    </div>
+    <div id="mobile" class="mobile container">
+      <a href="/">Home</a>
+      <a href="/docs/">Docs</a>
+      <a href="https://github.com/flightlang" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn primary" href="/docs/#install">Get Started</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="container grid" style="grid-template-columns: 1.2fr .8fr; align-items:center;">
+      <div>
+        <span class="badge">Early Alpha • Python & Rust backends</span>
+        <h1>Write drone missions like code — <span style="background:linear-gradient(90deg, #2563eb, #14b8a6); -webkit-background-clip:text; background-clip:text; color:transparent;">safe, portable, declarative</span>.</h1>
+        <p class="lead">FlightLang is a domain-specific language (DSL) for UAV missions based on finite state machines, with unit-checked variables, deadlines, and multiple codegen backends (Python for simulation, Rust for controllers).</p>
+        <div class="hero-cta">
+          <a class="btn primary" href="/docs/#install">Install</a>
+          <a class="btn" href="/docs/">Read the docs →</a>
+        </div>
+        <div class="callout" style="margin-top:1rem;">Not for real flight yet — see roadmap and safety notes in the docs.</div>
+      </div>
+      <div class="card code">
+<pre><code class="language-plaintext">// A simple survey mission in FlightLang
+let cruise_alt: m = 60 m
+let max_speed: mps = 12 mps
+
+mission Survey {
+  preflight requires GPS_LOCK && BATTERY > 30%
+  geofence keepout polygon "worksite-a"
+
+  state Idle {
+    on arm -> Takeoff
+  }
+
+  state Takeoff {
+    action climb_to(cruise_alt) @ max_speed
+    on reached_altitude -> Transit
+  }
+
+  state Transit {
+    action goto(waypoint_grid(spacing: 25 m, bearing: 90 deg))
+    on obstacle_detected -> Avoid
+    on grid_complete -> RTL
+  }
+
+  state Avoid {
+    deadline 50 ms
+    action sidestep(5 m) then resume
+    on clear -> Transit
+  }
+
+  state RTL {
+    action return_to_launch()
+    on landed -> Done
+  }
+
+  state Done { }
+}
+</code></pre>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <div class="container">
+        <h2 class="kicker">Why FlightLang</h2>
+        <div class="grid cards">
+          <div class="card">
+            <h3>Readable mission spec</h3>
+            <p class="small">State machines instead of ad-hoc scripts. Preflight checks, deadlines, transitions — all explicit.</p>
+          </div>
+          <div class="card">
+            <h3>Units & types</h3>
+            <p class="small">Unit-aware numbers (<code>m</code>, <code>mps</code>, <code>deg</code>, <code>ms</code>) with simple checks.</p>
+          </div>
+          <div class="card">
+            <h3>Multi-backend</h3>
+            <p class="small">Generate Python for simulation or Rust for controllers. PX4/ROS 2 stubs included.</p>
+          </div>
+          <div class="card">
+            <h3>Open & extensible</h3>
+            <p class="small">Add new actions, events, and backends without changing mission specs.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container grid" style="grid-template-columns: 1fr 1fr; align-items: start;">
+        <div class="card">
+          <h3>Install (Python)</h3>
+          <div class="code"><pre><code class="language-bash"># from your project dir
+python -m flightlang.cli run examples/survey.fl
+
+# or generate runnable Python
+python -m flightlang.cli build examples/survey.fl -o out.py
+python out.py</code></pre></div>
+        </div>
+        <div class="card">
+          <h3>Generate Rust</h3>
+          <div class="code"><pre><code class="language-bash">python -m flightlang.cli build examples/survey.fl --backend rust --outdir mission_rs
+cd mission_rs && cargo run</code></pre></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2 class="kicker">How it works</h2>
+        <div class="grid cards" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+          <div class="card"><strong>1) Parse</strong><br><span class="small">Lexer & parser build an AST from your <code>.fl</code>.</span></div>
+          <div class="card"><strong>2) Check</strong><br><span class="small">Simple unit/type checks catch mistakes early.</span></div>
+          <div class="card"><strong>3) Generate</strong><br><span class="small">Emit Python or Rust with a tiny runtime or stubs.</span></div>
+          <div class="card"><strong>4) Run</strong><br><span class="small">Simulate or compile; integrate with PX4/ROS 2 later.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container card">
+        <h3>Join the project</h3>
+        <p class="small">We welcome issues, discussions, and PRs. See the roadmap for where help is most needed.</p>
+        <a class="btn" href="https://github.com/flightlang" target="_blank" rel="noopener">Contribute on GitHub →</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container" style="display:flex; justify-content: space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:.6rem;">
+        <img src="assets/logo.svg" alt="" style="height:20px;width:20px;opacity:.9;">
+        <span class="small">© 2025 FlightLang</span>
+      </div>
+      <div class="small">
+        <a href="/docs/">Docs</a> · <a href="https://github.com/flightlang" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
